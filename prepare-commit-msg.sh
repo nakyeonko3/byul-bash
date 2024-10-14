@@ -73,8 +73,9 @@ format_commit_message() {
 COMMIT_MSG_FILE="$1"
 COMMIT_SOURCE="$2"
 
-if [ "$COMMIT_SOURCE" = "merge" ]; then
-    print_color "$BLUE" "Merge commit detected. Skipping formatting."
+# Check if the commit is a merge, squash, or amend
+if [ "$COMMIT_SOURCE" = "merge" ] || [ "$COMMIT_SOURCE" = "squash" ] || [ "$COMMIT_SOURCE" = "commit" ]; then
+    print_color "$BLUE" "Merge, squash, or amend commit detected. Skipping formatting."
     exit 0
 fi
 
