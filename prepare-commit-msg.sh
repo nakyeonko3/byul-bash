@@ -1,5 +1,18 @@
 #!/bin/sh
 
+# Check if .env file exists and byulBash is set to true
+if [ -f .env ]; then
+    byul_bash=$(grep '^byulBash=' .env | cut -d '=' -f2)
+    if [ "$byul_bash" != "true" ]; then
+        exit 0
+    fi
+else
+    exit 0
+fi
+
+COMMIT_MSG_FILE="$1"
+COMMIT_SOURCE="$2"
+
 # ANSI color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
