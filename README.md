@@ -10,11 +10,6 @@ byul forks, It quickly and easily formats commit messages automatically using Gi
 byulBash=true
 ```
 
-그리고 npm i를 하여 종속성을 재설치하기
-```
-npm i
-```
-
 ### 작동 방식
 1. git commit 입력시 자동으로 이슈번호와 이슈타입이 추출되서 커밋 메시지 파일에 들어가게됨.
 2. git commit -m 을 입력시에도 자동으로 이슈번호랑 이슈타입이 들어가게됨. 
