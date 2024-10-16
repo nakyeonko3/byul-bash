@@ -1,5 +1,5 @@
 # byul-bash
-byul forks, It quickly and easily formats commit messages automatically using Git hooks 
+byul forks,javascript가 아닌 bash스크립트로 재작성된 byul
 
 
 ### 사용 방법
