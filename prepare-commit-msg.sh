@@ -1,7 +1,6 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # prepare-commit-msg
 
-# Exit if no commit message file is provided
 if [ -z "$1" ]; then
     echo "Error: No commit message file provided"
     exit 1
@@ -43,84 +42,80 @@ read_json_value() {
     sed -n "s/^.*\"$key\": *\"\\(.*\\)\".*$/\\1/p" "$json_file" | sed 's/,$//'
 }
 
+extract_type_and_number() {
+    branch_name="$1"
+    
+    # Extract type (bug, feat, fix, etc.) - take everything before the first slash
+    branch_type=$(echo "$branch_name" | cut -d'/' -f1)
+    
+    # Extract issue number - take the last number sequence in the branch name
+    issue_number=$(echo "$branch_name" | grep -Eo '[0-9]+$')
+    
+    echo "$branch_type|$issue_number"
+}
+
 format_commit_message() {
     commit_msg_file="$1"
     commit_source="$2"
     branch_name=$(git symbolic-ref --short HEAD)
-    branch_type=""
-    issue_number=""
 
     json_file=$(git rev-parse --show-toplevel)/byul.config.json
     if [ ! -f "$json_file" ]; then
         print_color "$YELLOW" "Warning: byul.config.json not found. Using default format."
-        byul_format="{type}: {commitMessage} (#{issueNumber})"
+        byul_format="[{type}] {commitMessage} #{issueNumber}"
     else
         byul_format=$(read_json_value "$json_file" "byulFormat")
         if [ -z "$byul_format" ]; then
             print_color "$YELLOW" "Warning: byulFormat not found in config. Using default format."
-            byul_format="{type}: {commitMessage} (#{issueNumber})"
+            byul_format="[{type}] {commitMessage} #{issueNumber}"
         fi
     fi
 
-    if ! echo "$branch_name" | grep -q "/"; then
-        print_color "$YELLOW" "Branch name does not contain '/'. Skipping formatting."
+    # Extract type and issue number
+    extracted=$(extract_type_and_number "$branch_name")
+    branch_type=$(echo "$extracted" | cut -d'|' -f1)
+    issue_number=$(echo "$extracted" | cut -d'|' -f2)
+    echo "Branch type: $branch_type"
+    echo "Issue number: $issue_number"
+    echo "Commit source: $commit_source"
+
+    if [ -z "$branch_type" ]; then
+        print_color "$YELLOW" "Could not extract branch type. Skipping formatting."
         return 1
     fi
 
-    parts=$(echo "$branch_name" | tr "/" "\n")
-    num_parts=$(echo "$parts" | wc -l)
-    if [ $num_parts -ge 2 ]; then
-        branch_type=$(echo "$parts" | sed -n "$(($num_parts-1))p")
-    else
-        branch_type=$(echo "$parts" | sed -n "1p")
-    fi
-
-    last_part=$(echo "$branch_name" | sed 's/.*\///')
-    issue_number=$(echo "$last_part" | sed -n 's/.*-\([0-9]\+\)$/\1/p')
-
     if [ "$commit_source" = "message" ]; then
-        # For -m flag commits, use the original behavior
+        # For -m flag commits
         first_line=$(head -n 1 "$commit_msg_file")
         
-        if [ -n "$branch_type" ]; then
-            formatted_msg=$(echo "$byul_format" |
-                sed "s/{type}/$branch_type/g" |
-                sed "s/{commitMessage}/$first_line/g" |
-                sed "s/{issueNumber}/$issue_number/g")
+        formatted_msg=$(echo "$byul_format" |
+            sed "s/{type}/$branch_type/g" |
+            sed "s/{commitMessage}/$first_line/g" |
+            sed "s/{issueNumber}/$issue_number/g")
 
-            echo "$formatted_msg" > "$commit_msg_file.tmp"
-            tail -n +2 "$commit_msg_file" >> "$commit_msg_file.tmp"
-            mv "$commit_msg_file.tmp" "$commit_msg_file"
-        fi
+        echo "$formatted_msg" > "$commit_msg_file.tmp"
+        tail -n +2 "$commit_msg_file" >> "$commit_msg_file.tmp"
+        mv "$commit_msg_file.tmp" "$commit_msg_file"
     else
-        # Get template comments (starting from the first #)
+        # For editor commits
         template_start=$(grep -n "^#" "$commit_msg_file" | head -n 1 | cut -d: -f1)
         
-        if [ -n "$branch_type" ]; then
-            formatted_msg=$(echo "$byul_format" |
-                sed "s/{type}/$branch_type/g" |
-                sed "s/{commitMessage}//g" |
-                sed "s/{issueNumber}/$issue_number/g")
-            
-            formatted_msg=$(echo "$formatted_msg" | sed 's/:  */: /g')
+        formatted_msg=$(echo "$byul_format" |
+            sed "s/{type}/$branch_type/g" |
+            sed "s/{commitMessage}//g" |
+            sed "s/{issueNumber}/$issue_number/g")
+        
+        formatted_msg=$(echo "$formatted_msg" | sed 's/:  */: /g')
 
-            # Create temporary file
-            tmp_file="${commit_msg_file}.tmp"
-            
-            # Add formatted message
-            echo "$formatted_msg" > "$tmp_file"
-            
-            # Add a blank line after the formatted message
-            echo "" >> "$tmp_file"
-            
-            # Append all lines from template_start to the end of the file
-            if [ -n "$template_start" ]; then
-                tail -n +"$template_start" "$commit_msg_file" >> "$tmp_file"
-            fi
-            
-            # Replace the original file
-            mv "$tmp_file" "$commit_msg_file"
+        tmp_file="${commit_msg_file}.tmp"
+        echo "$formatted_msg" > "$tmp_file"
+        echo "" >> "$tmp_file"
+        
+        if [ -n "$template_start" ]; then
+            tail -n +"$template_start" "$commit_msg_file" >> "$tmp_file"
         fi
+        
+        mv "$tmp_file" "$commit_msg_file"
     fi
 
     print_color "$GREEN" "✔ Commit message formatted successfully!"
